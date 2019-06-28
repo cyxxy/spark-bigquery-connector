@@ -80,6 +80,7 @@ gcloud dataproc jobs submit pyspark --cluster "$MY_CLUSTER" \
   examples/python/shakespeare.py
 ```
 
+
 ## Compiling against the connector
 
 Unless you wish to use the implicit Scala API `spark.read.bigquery("TABLE_ID")`, there is no need to compile against the connector.
@@ -92,14 +93,14 @@ To include the connector in your project:
 <dependency>
   <groupId>com.google.cloud.spark</groupId>
   <artifactId>spark-bigquery_${scala.version}</artifactId>
-  <version>0.5.1-beta</version>
+  <version>0.6.0-beta</version>
 </dependency>
 ```
 
 ### SBT
 
 ```sbt
-libraryDependencies += "com.google.cloud.spark" %% "spark-bigquery" % "0.5.1-beta"
+libraryDependencies += "com.google.cloud.spark" %% "spark-bigquery" % "0.6.0-beta"
 ```
 
 ## API
@@ -171,30 +172,6 @@ The API Supports a number of options to configure the read
 <p>
 (Optional. Defaults to <code>SparkContext.getDefaultParallelism()</code>. See
 <a href="#configuring-partitioning">Configuring Partitioning</a>.)
-   </td>
-  </tr>
-  <tr>
-   <td><code>skewLimit</code>
-   </td>
-   <td>A soft limit to how many extra rows each partition will read after reading the expected number of rows (total rows / # partitions) for that partition.
-<p>
-It is a float representing the ratio of the limit to the expected number of rows e.g 2.0 allows each partition to be twice as large as expected.
-<p>
-Must be at least 1.0.
-<p>
-
-<p>
-(Optional. Defaults to 1.5 (150%). See
-
-<a href="#configuring-partitioning">Configuring Partitioning</a>.)
-   </td>
-  </tr>
-  <tr>
-   <td><code>filter</code>
-   </td>
-   <td>A manual predicate filter expression to pass to pass to BigQuery.
-<p>
-(Optional see <a href="#filtering">filtering</a>)
    </td>
   </tr>
 </table>
@@ -355,8 +332,6 @@ By default the connector creates one partition per current core available (Spark
 
 If not all partitions are currently being read some partitions may grow larger and some may be smaller or even empty. The fraction that partitions are allowed to grow beyond the expected total number of rows / number of partitions is bounded by the <code>
 
-[skewLimit](#properties)</code> parameter. The limit is soft and does not guarantee exact partitioning especially on small tables.
-
 ## Building the Connector
 
 The connector is built using [SBT](https://www.scala-sbt.org/):
@@ -377,14 +352,6 @@ You can manually set the number of partitions with the `parallelism` property. B
 
 You can also always repartition after reading in Spark.
 
-### I have empty partitions
-
-Because the Storage API balances records between partitions as you read, if you don't schedule all of your map tasks concurrently, the last scheduled partitions may be empty.
-
-Decreasing the skewLimit parameter to 1.0 (or something near it) should make your parttions more uniform (at the expense of tail latency). Alternatively you can increase your cluster size to schedule all partitions concurrently. See [Configuring Partitioning](#configuring-partitioning)
-
-You can also always repartition after reading in Spark, which should remove the empty partitions.
-
 ### How do I write to BigQuery?
 
 You can use the [existing MapReduce connector](https://github.com/GoogleCloudPlatform/bigdata-interop/tree/master/bigquery) or write DataFrames to GCS and then load the data into BigQuery.
@@ -393,4 +360,24 @@ You can use the [existing MapReduce connector](https://github.com/GoogleCloudPla
 
 Use a service account JSON key and `GOOGLE_APPLICATION_CREDENTIALS` as described [here](https://cloud.google.com/docs/authentication/getting-started).
 
-TODO(#6): Wire auth through Spark/Hadoop properties.
+Credentials can also be provided explicitly either as a parameter or from Spark runtime configuration.
+It can be passed in as a base64-encoded string directly, or a file path that contains the credentials (but not both).
+
+Example:
+```
+spark.read.format("bigquery").option("credentials", "<SERVICE_ACCOUNT_JSON_IN_BASE64>")
+```
+or
+```
+spark.conf.set("credentials", "<SERVICE_ACCOUNT_JSON_IN_BASE64>")
+```
+
+Alternatively, specify the credentials file name.
+
+```
+spark.read.format("bigquery").option("credentialsFile", "</path/to/key/file>")
+```
+or
+```
+spark.conf.set("credentialsFile", "</path/to/key/file>")
+```
